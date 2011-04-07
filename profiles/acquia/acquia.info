@@ -1,6 +1,5 @@
 name = Acquia Drupal
 description = Acquia enchanced Drupal.
-version = VERSION
 core = 7.x
 
 ; Modules from standard.info
@@ -44,4 +43,4 @@ files[] = acquia.profile
 ; Information added by Acquia.com packaging script
 acquia = "1"
 
-version = 7.x-1.0
+version = 7.x-1.1

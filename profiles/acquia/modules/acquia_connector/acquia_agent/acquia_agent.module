@@ -137,12 +137,10 @@ function acquia_agent_check_subscription($params = array()) {
     }
     // Include Acquia Search module version number.
     if (module_exists('acquia_search')) {
-      $result = db_query("SELECT name, info FROM {system} WHERE name IN ('acquia_search', 'apachesolr')");
-      foreach ($result as $data) {
-        if ($info = unserialize($data->info)) {
-          // Send the version, or at least the core compatibility as a fallback.
-          $params['search_version'][$data->name] = isset($info['version']) ? (string)$info['version'] : (string)$info['core'];
-        }
+      foreach (array('acquia_search', 'apachesolr') as $name) {
+        $info = system_get_info('module', $name);
+        // Send the version, or at least the core compatibility as a fallback.
+        $params['search_version'][$name] = isset($info['version']) ? (string)$info['version'] : (string)$info['core'];
       }
     }
     $data = acquia_agent_call('acquia.agent.subscription', $params);

@@ -28,6 +28,9 @@ Acquia Site profile: Automates the collection of site information -
 operating system, database, webserver, and PHP versions, installed modules,
 and site modifications - to speed support communication and issue resolution.
 
+Acquia Search: Provides integration between your Drupal site and Acquia's
+hosted search service. Requires Apache Solr Search Integration module.
+
 Installation
 --------------------------------------------------------------------------------
 
