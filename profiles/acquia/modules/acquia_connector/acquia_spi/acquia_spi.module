@@ -101,8 +101,8 @@ function acquia_spi_get_platform() {
   preg_match('!^([^/]+)(/.+)?$!', $_SERVER['SERVER_SOFTWARE'], $webserver);
   $platform = array(
     'php'               => PHP_VERSION,
-    'webserver_type'    => $webserver[1],
-    'webserver_version' => $webserver[2],
+    'webserver_type'    => isset($webserver[1]) ? $webserver[1] : '',
+    'webserver_version' => isset($webserver[2]) ? $webserver[2] : '',
     'database_type'     => db_driver(),
     'database_version'  => Database::getConnection()->getAttribute(PDO::ATTR_SERVER_VERSION),
     'system_type'       => php_uname('s'),

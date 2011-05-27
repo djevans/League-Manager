@@ -653,7 +653,7 @@ function acquia_agent_an_info_header() {
   $output .=   '</div>';
   $output .=   '<div class="cell an-center">';
   $output .=     '<h2>' . t('Acquia Search') . '</h2>';
-  $output .=     t('Add faceted search and content recommendations.') . ' ' . t('(Drupal 7 support coming soon!)');
+  $output .=     t('Add faceted search and content recommendations.');
   $output .=     '<br/>' . l(t('Learn more'), 'http://acquia.com/products-services/acquia-search', $l_opt);
   $output .=   '</div>';
   $output .=   '<div class="cell an-right">';

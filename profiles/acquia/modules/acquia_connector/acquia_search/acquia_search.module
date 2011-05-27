@@ -5,15 +5,16 @@
  *   Integration between Acquia Drupal and Acquia's hosted solr search service.
  */
 
-define('ACQUIA_SEARCH_SERVER_ID', 'acquia_search_server_1');
+define('ACQUIA_SEARCH_ENVIRONMENT_ID', 'acquia_search_server_1');
 
 /**
- * Predefined Acquia Search network server
+ * Predefined Acquia Search network environment
  */
-function acquia_search_get_server() {
+function acquia_search_get_environment() {
   return array(
-    'server_id' => ACQUIA_SEARCH_SERVER_ID,
+    'env_id' => ACQUIA_SEARCH_ENVIRONMENT_ID,
     'name' => t('Acquia Search'),
+    // @todo - server URL may depend on region info.
     'url' => variable_get('acquia_search_url', 'http://search.acquia.com/solr/'. acquia_agent_settings('acquia_identifier')),
     'service_class' => 'AcquiaSearchService',
   );
@@ -24,7 +25,7 @@ function acquia_search_get_server() {
  */
 function acquia_search_enable() {
   if (acquia_agent_subscription_is_active()) {
-    acquia_search_enable_acquia_solr_server();
+    acquia_search_enable_acquia_solr_environment();
     // Send a heartbeat so the Acquia Network knows the module is enabled.
     acquia_agent_check_subscription();
   }
@@ -37,7 +38,7 @@ function acquia_search_init() {
   if (arg(0) == 'admin' && arg(1) == 'config' && arg(2) == 'search' && arg(3) == 'apachesolr'
       && user_access('administer search')
       && acquia_agent_subscription_is_active()
-      && variable_get('apachesolr_default_server') == ACQUIA_SEARCH_SERVER_ID
+      && variable_get('apachesolr_default_environment') == ACQUIA_SEARCH_ENVIRONMENT_ID
       && empty($_POST)) {
     $as_link = l(t('Acquia Search'), 'http://acquia.com/products-services/acquia-search');
     drupal_set_message(t("Search is being provided by the !as network service.", array('!as' => $as_link)));
@@ -47,14 +48,14 @@ function acquia_search_init() {
 /**
  * Create a new record pointing to the Acquia apachesolr search server and set it as the default
  */
-function acquia_search_enable_acquia_solr_server() {
-  $server = apachesolr_server_load(ACQUIA_SEARCH_SERVER_ID);
-  if ($server != acquia_search_get_server()) {
-    apachesolr_server_save(acquia_search_get_server());
+function acquia_search_enable_acquia_solr_environment() {
+  $environment = apachesolr_environment_load(ACQUIA_SEARCH_ENVIRONMENT_ID);
+  if ($environment != acquia_search_get_environment()) {
+    apachesolr_environment_save(acquia_search_get_environment());
   }
-  // Only set the default if we just createdd the server.
-  if (!$server) {
-    variable_set('apachesolr_default_server', ACQUIA_SEARCH_SERVER_ID);
+  // Only set the default if we just createdd the environment.
+  if (!$environment) {
+    variable_set('apachesolr_default_environment', ACQUIA_SEARCH_ENVIRONMENT_ID);
   }
 }
 
@@ -64,14 +65,10 @@ function acquia_search_enable_acquia_solr_server() {
  * Helper function to clear variables we may have set.
  */
 function acquia_search_disable() {
-  apachesolr_server_delete(ACQUIA_SEARCH_SERVER_ID);
-  $servers = apachesolr_load_all_servers();
-  if (empty($servers)) {
-    apachesolr_server_save(array('server_id' => 'solr', 'name' => 'Apache Solr server', 'url' => 'http://localhost:8983/solr'));
-    variable_set('apachesolr_default_server', 'solr');
-  }
-  else {
-    variable_set('apachesolr_default_server', key($servers));
+  apachesolr_environment_delete(ACQUIA_SEARCH_ENVIRONMENT_ID);
+  if (variable_get('apachesolr_default_environment', 'solr') == ACQUIA_SEARCH_ENVIRONMENT_ID) {
+    // Go back to the default.
+    variable_del('apachesolr_default_environment');
   }
 }
 
@@ -79,10 +76,10 @@ function acquia_search_disable() {
  * Implementation of hook_menu_alter().
  */
 function acquia_search_menu_alter(&$menu) {
-  $delete_page = 'admin/config/search/apachesolr/server/%apachesolr_server/delete';
+  $delete_page = 'admin/config/search/apachesolr-env/%apachesolr_environment/delete';
   if (isset($menu[$delete_page])) {
-    $menu[$delete_page]['access callback'] = 'acquia_search_server_delete_access';
-    $menu[$delete_page]['access arguments'] = array(5);
+    $menu[$delete_page]['access callback'] = 'acquia_search_environment_delete_access';
+    $menu[$delete_page]['access arguments'] = array(4);
   };
 }
 
@@ -98,14 +95,14 @@ function acquia_search_cron() {
 }
 
 /**
- * Delete server page access.
+ * Delete environment page access.
  */
-function acquia_search_server_delete_access($server) {
-  if ($server['server_id'] == ACQUIA_SEARCH_SERVER_ID) {
+function acquia_search_environment_delete_access($environment) {
+  if ($environment['env_id'] == ACQUIA_SEARCH_ENVIRONMENT_ID) {
     return FALSE;
   }
   // Fall back to the original check.
-  return user_access('administer search');  
+  return user_access('administer search');
 }
 
 /**
@@ -114,9 +111,9 @@ function acquia_search_server_delete_access($server) {
 function acquia_search_form_apachesolr_settings_alter(&$form, $form_state) {
   // Don't alter the form if there is no subscription.
   if (acquia_agent_subscription_is_active()) {
-    // Don't show delete operation for the AS server
+    // Don't show delete operation for the AS environment
     foreach ($form['apachesolr_host_settings']['table']['#rows'] as &$row) {
-      if (isset($row['data'][2]['data']) && strpos($row['data'][2]['data'], 'apachesolr/server/' . ACQUIA_SEARCH_SERVER_ID . '/delete') !== FALSE) {
+      if (isset($row['data'][2]['data']) && strpos($row['data'][2]['data'], 'search/apachesolr-env/' . ACQUIA_SEARCH_ENVIRONMENT_ID . '/delete') !== FALSE) {
         $row['data'][2]['data'] = '';
         break;
       }
@@ -135,21 +132,22 @@ function acquia_search_form_apachesolr_settings_alter(&$form, $form_state) {
 /**
  * Implementation of hook_form_[form_id]_alter().
  */
-function acquia_search_form_apachesolr_server_edit_form_alter(&$form, $form_state) {
-  // Do not allow editing of Acquia Search server parameters
-  if (isset($form_state['build_info']['args'][0]['server_id']) && $form_state['build_info']['args'][0]['server_id'] == ACQUIA_SEARCH_SERVER_ID ) {
-    $form['url']['#disabled'] = TRUE; 
+function acquia_search_form_apachesolr_environment_edit_form_alter(&$form, $form_state) {
+  // Do not allow editing of Acquia Search environment parameters
+  if (isset($form['env_id']['#default_value']) && $form['env_id']['#default_value'] == ACQUIA_SEARCH_ENVIRONMENT_ID ) {
+    $form['url']['#disabled'] = TRUE;
     $form['name']['#disabled'] = TRUE;
-    $form['server_id']['#disabled'] = TRUE;    
+    $form['env_id']['#disabled'] = TRUE;
   }
 
-  $form['save']['#validate'][] = 'acquia_search_server_edit_form_validate';
+  $form['actions']['delete']['#access'] = FALSE;
+  $form['actions']['save']['#validate'][] = 'acquia_search_environment_edit_form_validate';
 }
 
-function acquia_search_server_edit_form_validate($form, &$form_state) {
-  if ($form_state['values']['server_id'] == ACQUIA_SEARCH_SERVER_ID) {
-    // make sure that the server parameters has not been changed
-    $form_state['values'] = array_merge($form_state['values'], acquia_search_get_server());
+function acquia_search_environment_edit_form_validate($form, &$form_state) {
+  if ($form_state['values']['env_id'] == ACQUIA_SEARCH_ENVIRONMENT_ID) {
+    // make sure that the environment parameters have not been changed
+    $form_state['values'] = array_merge($form_state['values'], acquia_search_get_environment());
   }
 }
 
@@ -159,7 +157,7 @@ function acquia_search_server_edit_form_validate($form, &$form_state) {
 
 function acquia_search_acquia_subscription_status($active) {
   if ($active) {
-    acquia_search_enable_acquia_solr_server();
+    acquia_search_enable_acquia_solr_environment();
   }
   else {
     acquia_search_disable();
@@ -288,20 +286,20 @@ function acquia_search_extract_hmac($headers) {
  *
  * Possibly alters the query type ('defType') param to edismax.
  */
-function acquia_search_apachesolr_modify_query($query, $caller) {
+function acquia_search_apachesolr_query_alter($query) {
   // @todo - does it make sense to check $caller too?
-  if ($query->solr('getServerId') != ACQUIA_SEARCH_SERVER_ID || isset($query->params['qt']) || isset($query->params['defType'])) {
+  if ($query->solr('getId') != ACQUIA_SEARCH_ENVIRONMENT_ID || $query->getParam('qt') || $query->getParam('defType')) {
     // This is a 'mlt' query or something else custom.
     return;
   }
   // Set the qt to edismax if we have keywords, and we always use it, or are
   // using a wildcard (* or ?).
-  $keys = $query->get_query_basic();
+  $keys = $query->getParam('q');
   if ($keys && (($wildcard = preg_match('/\S+[*?]/', $keys)) || variable_get('acquia_search_edismax_default', 0))) {
-    $query->params['defType'] = 'edismax';
+    $query->addParam('defType', 'edismax');
     if ($wildcard) {
       $keys = preg_replace_callback('/(\S+[*?]\S*)/', '_acquia_search_lower', $keys);
-      $query->set_keys($keys);
+      $query->replaceParam('q', $keys);
     }
   }
 }

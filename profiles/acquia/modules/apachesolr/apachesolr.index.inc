@@ -76,7 +76,7 @@ function apachesolr_node_to_document($node, $namespace) {
     }
     $document->ds_created = apachesolr_date_iso($node->created);
     $document->ds_changed = apachesolr_date_iso($node->changed);
-    if (isset($node->last_comment_timestamp)) {
+    if (isset($node->last_comment_timestamp) && !empty($node->comment_count)) {
       $document->ds_last_comment_timestamp = apachesolr_date_iso($node->last_comment_timestamp);
       $document->ds_last_comment_or_change = apachesolr_date_iso(max($node->last_comment_timestamp, $node->changed));
     }
@@ -93,7 +93,7 @@ function apachesolr_node_to_document($node, $namespace) {
       if (isset($node->{$field_name})) {
         // Got a field.
         $function = $field_info['indexing_callback'];
-        if ($function && function_exists($function)) {
+        if ($function && is_callable($function)) {
           // NOTE: This function should always return an array.  One
           // node field may be indexed to multiple Solr fields.
           $fields = $function($node, $field_name, $index_key, $field_info);
@@ -245,6 +245,9 @@ function apachesolr_fields_list_indexing_callback($entity, $field_name, $index_k
   return $fields;
 }
 
+/**
+ *  @see http://drupal.org/node/1059372
+ */
 function apachesolr_cck_nodereference_indexing_callback($node, $field_name, $index_key, $cck_info) {
   $fields = array();
   if (!empty($node->{$field_name})) {
@@ -261,6 +264,9 @@ function apachesolr_cck_nodereference_indexing_callback($node, $field_name, $ind
   return $fields;
 }
 
+/**
+ *  @see http://drupal.org/node/1059372
+ */
 function apachesolr_cck_userreference_indexing_callback($node, $field_name, $index_key, $cck_info) {
   $fields = array();
   if (!empty($node->$field_name)) {
@@ -282,7 +288,7 @@ function apachesolr_cck_userreference_indexing_callback($node, $field_name, $ind
  *
  * $text must be stripped of control characters before hand.
  */
-function apachesolr_add_tags_to_document(&$document, $text) {
+function apachesolr_add_tags_to_document($document, $text) {
   $tags_to_index = variable_get('apachesolr_tags_to_index', array(
     'h1' => 'tags_h1',
     'h2' => 'tags_h2_h3',
@@ -386,7 +392,7 @@ function apachesolr_nodeapi_mass_update($nodes) {
     return TRUE;
   }
 
-  if (apachesolr_server_variable_get(apachesolr_default_server(), 'apachesolr_read_only', APACHESOLR_READ_WRITE) == APACHESOLR_READ_ONLY) {
+  if (apachesolr_environment_variable_get(apachesolr_default_environment(), 'apachesolr_read_only', APACHESOLR_READ_WRITE) == APACHESOLR_READ_ONLY) {
     return TRUE;
   }
 
@@ -425,7 +431,7 @@ function apachesolr_nodeapi_mass_delete($nodes) {
     return TRUE;
   }
 
-  if (apachesolr_server_variable_get(apachesolr_default_server(), 'apachesolr_read_only', APACHESOLR_READ_WRITE) == APACHESOLR_READ_ONLY) {
+  if (apachesolr_environment_variable_get(apachesolr_default_environment(), 'apachesolr_read_only', APACHESOLR_READ_WRITE) == APACHESOLR_READ_ONLY) {
     return TRUE;
   }
 

@@ -1,41 +1,48 @@
 <?php
 /**
- *
  * Exposed Hooks in 7.x:
  */
 
 /**
-  * Any module performing a search should call apachesolr_modify_query($query, 'modulename').
-  * That function then invokes this hook. It allows modules to modify the query object and params array.
-  * $caller indicates which module is invoking the hook. A return value of TRUE from
-  * apachesolr_modify_query() indicates the search should be aborted. A module implementing
-  * hook_apachesolr_modify_query() may return TRUE to flag the query to be aborted.
-  */
-function hook_apachesolr_modify_query($query, $caller) {
-  // I only want to see articles by the admin!
-  $query->add_filter("is_uid", 1);
-}
-
-/**
- * The module calling apachesolr_do_query() may implement a function that is run after
- * hook_apachesolr_modify_query() and allows the caller to make final changes to the
- * query and params before the query is sent to Solr.  The function name is built
- * from the $caller parameter to apachesolr_do_query().
+ * Prepare the query by adding parameters, sorts, etc.
+ *
+ * This hook is invoked before the query is cached.  The cached query
+ * is used after the search such as for building facet and sort blocks,
+ * so parameters added during this hook may be visible to end users.
+ *
+ * This is otherwise the same as HOOK_apachesolr_query_alter(), but runs
+ * before it.
+ *
+ * @param $query
+ *  An object implementing DrupalSolrQueryInterface. No need for &.
  */
-function CALLER_finalize_query($query) {
-}
-
-/**
- *  This is pretty much the same as hook_apachesolr_modify_query() but runs earlier
- * and before the query is statically cached. It can e.g. be used to add
- * available sorts to the query.
- */
-function hook_apachesolr_prepare_query($query, $caller) {
+function HOOK_apachesolr_query_prepare($query) {
   // Add a sort on the node ID.
-  $query->set_available_sort('entity_id', array(
+  $query->setAvailableSort('entity_id', array(
     'title' => t('Node ID'),
     'default' => 'asc',
   ));
+}
+
+/**
+ * Alter the query after it's prepared and cached.
+ *
+ * Any module performing a search should call
+ * drupal_alter('apachesolr_query', $query). That function then invokes
+ * this hook. It allows modules to modify the query object and its params.
+ *
+ * A module implementing HOOK_apachesolr_query_alter() may set
+ * $query->abort_search to TRUE to flag the query to be aborted.
+ *
+ * @param $query
+ *  An object implementing DrupalSolrQueryInterface. No need for &.
+ */
+function HOOK_apachesolr_query_alter($query) {
+  // I only want to see articles by the admin!
+  $query->addFilter("is_uid", 1);
+
+  // Only search titles.
+  $query->replaceParam('qf', 'label');
 }
 
 /**
@@ -69,7 +76,7 @@ function hook_apachesolr_prepare_query($query, $caller) {
 
       $mappings['number_integer']['number'] = array('callback' => '', 'index_type' => 'integer', 'facets' => FALSE);
  */
-function hook_apachesolr_field_mappings_alter(&$mappings) {
+function HOOK_apachesolr_field_mappings_alter(&$mappings) {
 
 }
 
@@ -80,7 +87,7 @@ function hook_apachesolr_field_mappings_alter(&$mappings) {
  * (e.g. 'apachesolr_search'). This is used by apachesolr_search module to exclude
  * certain node types from the index.
  */
-function hook_apachesolr_types_exclude($namespace) {
+function HOOK_apachesolr_types_exclude($namespace) {
 }
 
 /**
@@ -90,7 +97,7 @@ function hook_apachesolr_types_exclude($namespace) {
  * excluded will not be removed from the index automatically. This hook can be
  * used to remove them prior to returning TRUE.
  */
-function hook_apachesolr_node_exclude($node, $namespace) {
+function HOOK_apachesolr_node_exclude($node, $namespace) {
   // Exclude nodes from uid 1.
   if ($node->uid == 1) {
     apachesolr_delete_node_from_index($node);
@@ -103,18 +110,31 @@ function hook_apachesolr_node_exclude($node, $namespace) {
  * To add a new field to the document, you should generally use one of the pre-defined dynamic fields.
  * Follow the naming conventions for the type of data being added based on the schema.xml file.
  */
-function hook_apachesolr_update_index($document, $node) {
+function HOOK_apachesolr_update_index($document, $node) {
 }
 
 /**
  * The is invoked by apachesolr_search.module for each document returned in a search - new in 6.x-beta7
- * as a replacement for the call to hook_nodeapi().
+ * as a replacement for the call to HOOK_nodeapi().
  */
-function hook_apachesolr_search_result_alter($doc) {
+function HOOK_apachesolr_search_result_alter($doc) {
 }
 
 /**
  *   Called by the sort link block code. Allows other modules to modify, add or remove sorts.
  */
-function hook_apachesolr_sort_links_alter(&$sort_links) {
+function HOOK_apachesolr_sort_links_alter(&$sort_links) {
 }
+
+/**
+ * Respond to search environment deletion.
+ *
+ * This hook is invoked from apachesolr_environment_delete() after the environment is removed
+ * from the database.
+ *
+ * @param $environment
+ *   The environment object that is being deleted.
+ */
+function HOOK_apachesolr_environment_delete($environment) {
+}
+

@@ -57,13 +57,9 @@ function acquia_agent_page_alter(&$page) {
  * Pre-render function which dynamically adds links to the toolbar.
  */
 function acquia_agent_toolbar_add_links($toolbar) {
-
-    $subscription = acquia_agent_settings('acquia_subscription_data');
-    if (empty($subscription['timestamp']) || (time() - $subscription['timestamp'] > 60*60*24)) {
-      $subscription = acquia_agent_check_subscription(array('no_heartbeat' => 1));
-    }
     $link['html'] = TRUE;
-    if (!empty($subscription['active'])) {
+    if (acquia_agent_subscription_is_active()) {
+      $subscription = acquia_agent_settings('acquia_subscription_data');
       // Yes, this uses inline CSS, which sounds bad, but including a CSS file
       // just for this sounds equally bad.
       $icon = '<img src="'. base_path() . 'misc/message-16-ok.png" alt="ok" style="vertical-align: middle;" />';
@@ -243,7 +239,7 @@ function acquia_agent_has_update_service() {
   acquia_agent_load_versions();
 
   $subscription = acquia_agent_settings('acquia_subscription_data');
-  if (!IS_ACQUIA_DRUPAL || !$subscription['active'] || (isset($subscription['update_service']) && empty($subscription['update_service']))) {
+  if (!IS_ACQUIA_DRUPAL || empty($subscription['active']) || (isset($subscription['update_service']) && empty($subscription['update_service']))) {
     // We don't have update service if (1) this is not Acquia Drupal, (2) there
     // is no subscription or (3) the update service was disabled on acquia.com.
     // Requiring the update_service key and checking its value separately is
@@ -443,7 +439,7 @@ function acquia_agent_network_address($acquia_network_address = NULL) {
  * Helper function to check if an identifer and key exist.
  */
 function acquia_agent_has_credentials() {
-  return (bool)(variable_get('acquia_identifier', '') && variable_get('acquia_key', ''));
+  return (bool)(variable_get('acquia_identifier', FALSE) && variable_get('acquia_key', FALSE));
 }
 
 /**
@@ -454,6 +450,10 @@ function acquia_agent_subscription_is_active() {
   // Subscription cannot be active if we have no credentials.
   if (acquia_agent_has_credentials()) {
     $subscription = acquia_agent_settings('acquia_subscription_data');
+    // Make sure we have data at least once per day.
+    if (isset($subscription['timestamp']) && (time() - $subscription['timestamp'] > 60*60*24)) {
+      $subscription = acquia_agent_check_subscription(array('no_heartbeat' => 1));
+    }
     $active = !empty($subscription['active']);
   }
   return $active;
