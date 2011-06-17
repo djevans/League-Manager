@@ -11,19 +11,25 @@
 class FacetapiWidgetLinks extends FacetapiWidget {
 
   /**
-   * Adds JS settings.
+   * Overrides constructor to reset the key.
+   *
+   * @param array $realm
+   *   The realm being rendered.
+   * @param array $settings
+   *   The realm settings.
+   * @param FacetapiFacet $facet
+   *   The facet object.
    */
-  public function init() {
+  public function __construct($id, array $realm, FacetapiFacet $facet, stdClass $settings) {
+    parent::__construct($id, $realm, $facet, $settings);
     $this->jsSettings['limit'] = $this->settings->settings['soft_limit'];
-    return parent::init();
+    $this->key = $facet['name'];
   }
 
   /**
    * Renders the links.
    */
   public function execute() {
-    // Sets the key, captures the facet's render array.
-    $this->key = $this->build['#facet']['name'];
     $element = &$this->build[$this->facet['field alias']];
 
     // Sets each item's theme hook, builds item list.

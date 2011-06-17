@@ -478,7 +478,7 @@ abstract class FacetapiAdapter {
       return $this->processors[$facet_name]->getMappedValue($value);
     }
     else {
-      return array('#markup' => '');
+      return array('#markup' => $value);
     }
   }
 
@@ -561,9 +561,15 @@ abstract class FacetapiAdapter {
       foreach ($item['facets'] as $facet_name) {
         $values = array_merge($values, $this->processors[$facet_name]->getActiveChildren($item['value']));
       }
+      // Handle the case of a URL value that matches no actual
+      // facet values. Otherwise, it can't be unclicked.
+      if (!in_array($item['value'], $values)) {
+        $values[] = $item['value'];
+      }
 
       // Builds variables for active link theme.
       $mapped = $this->getMappedValue($item['facets'][0], $item['value']);
+
       $variables = array(
         'text' => $mapped['#markup'],
         'path' => $_GET['q'],
@@ -658,6 +664,11 @@ abstract class FacetapiAdapter {
       // when merging facets with the same field alias such as taxonomy terms in
       // the fieldset realm. We want to merge only the values.
       foreach (element_children($facet_build) as $child) {
+        // Bails if there is nothing to render.
+        if (!element_children($facet_build[$child])) {
+          continue;
+        }
+        // Attempts to merge gracefully.
         if (!isset($build[$child])) {
           $build = array_merge_recursive($build, $facet_build);
         }
@@ -849,13 +860,20 @@ class FacetapiFacet implements ArrayAccess {
 
       if ($realm) {
 
+        if (!empty($this->facet['default widget'])) {
+          $widget = $this->facet['default widget'];
+        }
+        else {
+          $widget = $realm['default widget'];
+        }
         // Initializes realm-specific settings.
         $settings->settings = array(
           'weight' => 0,
-          'widget' => 'facetapi_links',
+          'widget' => $widget,
           'active_sorts' => array(),
           'sort_weight' => array(),
           'sort_order' => array(),
+          'empty_behavior' => 'none',
         );
 
         // Apply default sort settings.
@@ -867,8 +885,13 @@ class FacetapiFacet implements ArrayAccess {
         }
 
         // Loads default widget plugin, adds settings.
-        $id = $realm['default widget'];
+        $id = $settings->settings['widget'];
         $class = ctools_plugin_load_class('facetapi', 'widgets', $id, 'handler');
+        // Fallback in case we have an invalid default widgt.
+        if (!$class) {
+          $id = $settings->settings['widget'] = $realm['default widget'];
+          $class = ctools_plugin_load_class('facetapi', 'widgets', $id, 'handler');
+        }
         $plugin = new $class($id, $realm, $this, $settings);
         $settings->settings += $plugin->getDefaultSettings();
 
@@ -898,6 +921,16 @@ class FacetapiFacet implements ArrayAccess {
       // @todo Explore whether we should save settings for performance.
     }
 
+    // Ensures settings added in later versions of the module are initialized to
+    // prevent undefuned index errors after upgrading.
+    // @todo Remove in later versions.
+    if ($realm) {
+      $settings->settings += array('empty_behavior' => 'none');
+    }
+    else {
+      $settings->settings += array('facet_missing' => 0);
+    }
+
     return $settings;
   }
 
@@ -915,27 +948,42 @@ class FacetapiFacet implements ArrayAccess {
   public function build(array $realm, FacetapiFacetProcessor $processor) {
     $settings = $this->getSettings($realm);
 
-    // Builds the base render array for this facet across all realms. This
-    // ensures we are only pulling the data from the server once per facet.
+    // Gets the base render array from the facet processor.
     $this->build = $processor->getBuild();
 
-    // If there are no items, return an empty array.
-    if (!$this->build) {
-      return array();
-    }
-
-    // Instantiates the widget plugin and executes.
+    // Instantiates the widget plugin and initializes.
     $widget_name = $settings->settings['widget'];
     $class = ctools_plugin_load_class('facetapi', 'widgets', $widget_name, 'handler');
-    $plugin = new $class($widget_name, $realm, $this, $settings);
-    $plugin->init()->execute();
+    $widget_plugin = new $class($widget_name, $realm, $this, $settings);
+    $widget_plugin->init();
+
+    // Executes widget plugin if not empty, otherwise executes the empty
+    // behavior plugin.
+    if ($this->build) {
+      $widget_plugin->execute();
+      $build = $widget_plugin->getBuild();
+    }
+    else {
+      // Instantiates empty behavior plugin.
+      $id = $settings->settings['empty_behavior'];
+      $class = ctools_plugin_load_class('facetapi', 'empty_behaviors', $id, 'handler');
+      $empty_plugin = new $class($settings);
+      // Executes empty behavior plugin.
+      $build = $widget_plugin->getBuild();
+      $build[$this['field alias']] = $empty_plugin->execute();
+    }
+
+    // If the element is empty, unset it.
+    if (!$build[$this['field alias']]) {
+      unset($build[$this['field alias']]);
+    }
 
     // Adds JavaScript settings in a way that merges with others already set.
-    $merge_settings['facetapi']['facets'][] = $plugin->getJavaScriptSettings();
+    $merge_settings['facetapi']['facets'][] = $widget_plugin->getJavaScriptSettings();
     drupal_add_js($merge_settings, 'setting');
 
     // Returns array keyed by the FacetapiWidget::$key property.
-    return array($plugin->getKey() => $plugin->getBuild());
+    return array($widget_plugin->getKey() => $build);
   }
 }
 
@@ -1041,7 +1089,7 @@ class FacetapiFacetProcessor {
    *   The mapped value.
    */
   public function getMappedValue($value) {
-    return (isset($this->map[$value])) ? $this->map[$value] : '';
+    return (isset($this->map[$value])) ? $this->map[$value] : array('#markup' => $value);
   }
 
   /**
@@ -1106,7 +1154,7 @@ class FacetapiFacetProcessor {
         }
         if (isset($build[$key])) {
           $build[$key]['#markup'] = $this->map[$key]['#markup'];
-          $build[$key]['#html'] = !empty($this->map[$key]['#markup']);
+          $build[$key]['#html'] = !empty($this->map[$key]['#html']);
         }
       }
     }

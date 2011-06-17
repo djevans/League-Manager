@@ -102,7 +102,7 @@ abstract class FacetapiWidget {
       '#settings' => $this->settings,
       $this->facet['field alias'] => $this->facet->getBuild(),
       '#attributes' => array(
-        'class' => drupal_html_class("facetapi-facet-{$this->facet['name']}"),
+        'class' => array(drupal_html_class("facetapi-facet-{$this->facet['name']}")),
         'id' => drupal_html_id("facetapi-facet-$searcher-{$this->realm['name']}-{$this->facet['name']}"),
       ),
     );
@@ -114,7 +114,6 @@ abstract class FacetapiWidget {
     $this->jsSettings += array(
       'id' => $this->build['#attributes']['id'],
       'searcher' => $searcher,
-      'type' => $this->facet->getAdapter()->getType(),
       'realmName' => $this->realm['name'],
       'facetName' => $this->facet['name'],
       'queryType' => $this->facet['query type'],

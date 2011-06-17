@@ -24,29 +24,31 @@ function acquia_search_requirements($phase) {
     );
 
   }
-  // Check SSL support.
-  if (in_array('ssl', stream_get_transports(), TRUE)) {
-    $severity = REQUIREMENT_OK;
-    $requirements['acquia_search_ssl'] = array(
-      'description' => $t('The Acquia Search module is using SSL to protect the privacy of your content.'),
-    );
-  }
-  else {
-    $severity = REQUIREMENT_WARNING;
-    $requirements['acquia_search_ssl'] = array(
-      'description' => $t('In order to protect the privacy of your content with the Acquia Search module you must have SSL support enabled in PHP on your host.'),
-    );
-  }
-  $requirements['acquia_search_ssl']['title'] = $t('Acquia Search');
-  $requirements['acquia_search_ssl']['severity'] = $severity;
-  $requirements['acquia_search_ssl']['value'] = '';
+  if ($phase == 'runtime') {
+    // Check SSL support.
+    if (in_array('ssl', stream_get_transports(), TRUE)) {
+      $severity = REQUIREMENT_OK;
+      $requirements['acquia_search_ssl'] = array(
+        'description' => $t('The Acquia Search module is using SSL to protect the privacy of your content.'),
+      );
+    }
+    else {
+      $severity = REQUIREMENT_WARNING;
+      $requirements['acquia_search_ssl'] = array(
+        'description' => $t('In order to protect the privacy of your content with the Acquia Search module you must have SSL support enabled in PHP on your host.'),
+      );
+    }
+    $requirements['acquia_search_ssl']['title'] = $t('Acquia Search');
+    $requirements['acquia_search_ssl']['severity'] = $severity;
+    $requirements['acquia_search_ssl']['value'] = '';
 
-  // Check Apache Solr API version.
-  if (!defined('APACHESOLR_API_VERSION') || version_compare(APACHESOLR_API_VERSION, '3.0', '<')) {
-    $requirements['acquia_search_apachesolr']['title'] = $t('Acquia Search');
-    $requirements['acquia_search_apachesolr']['severity'] = REQUIREMENT_ERROR;
-    $requirements['acquia_search_apachesolr']['description'] = $t('Apache Solr API Integration requires  API version 3.0.  Please upgrade your Apache Solr Search Integration module');
-    $requirements['acquia_search_apachesolr']['value'] = $t('Incompatible API version');
+    // Check Apache Solr API version.
+    if (!defined('APACHESOLR_API_VERSION') || version_compare(APACHESOLR_API_VERSION, '3.0', '<')) {
+      $requirements['acquia_search_apachesolr']['title'] = $t('Acquia Search');
+      $requirements['acquia_search_apachesolr']['severity'] = REQUIREMENT_ERROR;
+      $requirements['acquia_search_apachesolr']['description'] = $t('Apache Solr API Integration requires  API version 3.0.  Please upgrade your Apache Solr Search Integration module');
+      $requirements['acquia_search_apachesolr']['value'] = $t('Incompatible API version');
+    }
   }
 
   return $requirements;
@@ -58,7 +60,7 @@ function acquia_search_requirements($phase) {
 function acquia_search_install() {
   return;
   $facets = _acquia_search_get_default_facets();
-  
+
   //apachesolr_save_enabled_facets(ACQUIA_SEARCH_ENVIRONMENT_ID, $facets);
 
   $theme_key = variable_get('theme_default', 'bartik');
@@ -92,7 +94,7 @@ function acquia_search_install() {
     // default value, and is not null, so we must provide one.
     $block['pages']  = '';
     // Make sure the block does not already exist.
-    if (!db_query("SELECT 1 FROM {block} WHERE theme = ':theme' AND module = ':module' AND delta = ':delta'", 
+    if (!db_query("SELECT 1 FROM {block} WHERE theme = ':theme' AND module = ':module' AND delta = ':delta'",
       array(':theme' => $block['theme'], ':module' => $block['module'], ':delta' => $block['delta']))->fetchField()){
       drupal_write_record('blocks', $block);
     }

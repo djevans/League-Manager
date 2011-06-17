@@ -2,18 +2,22 @@
 
 Drupal.behaviors.facetapi = {
   attach: function(context, settings) {
-    // Iterates over facet settings, applies functionality like the "Sore more"
+    // Iterates over facet settings, applies functionality like the "Show more"
     // links for block realm facets.
     // @todo We need some sort of JS API so we don't have to make decisions
     // based on the realm.
     for (var index in settings.facetapi.facets) {
       if ('block' == settings.facetapi.facets[index].realmName) {
-        // Find all checkbox facet links and give them a checkbox.
-        $('a.facetapi-checkbox.facetapi-inactive', context).each(Drupal.facetapi.addCheckbox);
-        // Find all unclick links and turn them into checkboxes.
-        $('a.facetapi-checkbox.facetapi-active', context).each(Drupal.facetapi.makeCheckbox);
-        // Applies soft limit to the list.
-        Drupal.facetapi.applyLimit(settings.facetapi.facets[index]);
+        if (null != settings.facetapi.facets[index].makeCheckboxes) {
+          // Find all checkbox facet links and give them a checkbox.
+          $('a.facetapi-checkbox.facetapi-inactive', context).each(Drupal.facetapi.addCheckbox);
+          // Find all unclick links and turn them into checkboxes.
+          $('a.facetapi-checkbox.facetapi-active', context).each(Drupal.facetapi.makeCheckbox);
+        }
+        if (null != settings.facetapi.facets[index].limit) {
+          // Applies soft limit to the list.
+          Drupal.facetapi.applyLimit(settings.facetapi.facets[index]);
+        }
       }
     }
   }
